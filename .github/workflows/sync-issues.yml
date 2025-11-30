@@ -1,0 +1,30 @@
+name: Sync MD to Issues
+
+on:
+  push:
+    paths:
+      - 'YunNan.md'
+    branches: [ main ]
+
+jobs:
+  sync-issues:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Sync MD to GitHub Issue
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const fs = require('fs');
+          const content = fs.readFileSync('YunNan.md', 'utf8');
+          
+          // 更新Issue #1
+          await github.rest.issues.update({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: 1,
+            body: content
+          });
+        github-token: ${{ secrets.GITHUB_TOKEN }}
