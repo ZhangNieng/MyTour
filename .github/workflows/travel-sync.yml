@@ -6,9 +6,7 @@ on:
       - 'YunNan.md'
     branches: [ main, master ]
 
-# 添加权限配置
 permissions:
-  contents: write
   issues: write
 
 jobs:
@@ -19,80 +17,42 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Find or Create Travel Issue
+      - name: Update Travel Issue
         uses: actions/github-script@v7
         with:
           script: |
             const fs = require('fs');
             const path = require('path');
             
+            // 读取文件内容
+            const filePath = path.join(process.env.GITHUB_WORKSPACE, 'YunNan.md');
+            const content = fs.readFileSync(filePath, 'utf8');
+            
+            // 使用你创建的Issue编号（应该是1）
+            const TARGET_ISSUE_NUMBER = 3;
+            
+            console.log(`🔄 更新Issue #${TARGET_ISSUE_NUMBER}...`);
+            
             try {
-              // 读取YunNan.md文件内容
-              const filePath = path.join(process.env.GITHUB_WORKSPACE, 'YunNan.md');
-              const content = fs.readFileSync(filePath, 'utf8');
+              const response = await github.rest.issues.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: TARGET_ISSUE_NUMBER,
+                body: content + `\n\n---\n*自动同步时间: ${new Date().toLocaleString('zh-CN')}*` +
+                      `\n*[查看源文件](https://github.com/${context.repo.owner}/${context.repo.repo}/blob/${context.sha}/YunNan.md)*`
+              });
               
-              const issueTitle = '🗺️ 云南旅行计划 - 协同任务清单';
-              console.log('🔄 开始同步云南旅行计划...');
-              
-              // 首先尝试手动创建一个已知编号的Issue（比如 #2）
-              const TARGET_ISSUE_NUMBER = 2;
-              
-              console.log(`📝 尝试更新Issue #${TARGET_ISSUE_NUMBER}...`);
-              
-              try {
-                await github.rest.issues.update({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  issue_number: TARGET_ISSUE_NUMBER,
-                  body: content + `\n\n---\n*最后同步时间: ${new Date().toLocaleString('zh-CN')}*` +
-                        `\n*[查看源文件](https://github.com/${context.repo.owner}/${context.repo.repo}/blob/${context.sha}/YunNan.md)*`
-                });
-                console.log(`✅ 成功更新Issue #${TARGET_ISSUE_NUMBER}`);
-                return;
-                
-              } catch (updateError) {
-                if (updateError.status === 404 || updateError.status === 410) {
-                  console.log(`❌ Issue #${TARGET_ISSUE_NUMBER} 不存在，尝试搜索现有Issue...`);
-                  
-                  // 搜索现有Issue
-                  const { data: issues } = await github.rest.issues.listForRepo({
-                    owner: context.repo.owner,
-                    repo: context.repo.repo,
-                    state: 'all',
-                    per_page: 30
-                  });
-                  
-                  // 查找旅行相关Issue
-                  const travelIssue = issues.find(issue => 
-                    !issue.pull_request && 
-                    (issue.title.includes('云南') || issue.title.includes('旅行') || 
-                     issue.title.includes('大理') || issue.title.includes('丽江'))
-                  );
-                  
-                  if (travelIssue) {
-                    console.log(`✅ 找到相关Issue: #${travelIssue.number}`);
-                    await github.rest.issues.update({
-                      owner: context.repo.owner,
-                      repo: context.repo.repo,
-                      issue_number: travelIssue.number,
-                      body: content + `\n\n---\n*最后同步时间: ${new Date().toLocaleString('zh-CN')}*`
-                    });
-                    console.log(`✅ 成功更新Issue #${travelIssue.number}`);
-                  } else {
-                    console.log('❌ 没有找到现有Issue，需要手动创建');
-                    console.log('💡 请手动创建一个Issue，然后更新工作流中的TARGET_ISSUE_NUMBER');
-                  }
-                } else {
-                  throw updateError;
-                }
-              }
+              console.log(`✅ 成功更新Issue #${TARGET_ISSUE_NUMBER}`);
+              console.log(`🔗 Issue链接: ${response.data.html_url}`);
               
             } catch (error) {
-              console.error('❌ 同步失败:', error.message);
-              console.log('💡 解决方案:');
-              console.log('1. 手动在GitHub仓库中创建一个Issue');
-              console.log('2. 记下Issue编号');
-              console.log('3. 更新工作流中的 TARGET_ISSUE_NUMBER 变量');
+              console.error(`❌ 更新失败: ${error.message}`);
+              if (error.status === 404) {
+                console.log('💡 Issue不存在，请手动创建第一个Issue');
+                console.log('1. 去仓库点击Issues → New Issue');
+                console.log('2. 创建标题为"云南旅行计划"的Issue');
+                console.log('3. 更新工作流中的Issue编号');
+              }
               throw error;
             }
           github-token: ${{ secrets.GITHUB_TOKEN }}
